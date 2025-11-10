@@ -1,0 +1,28 @@
+--- a/backend/app/api/routes_auth.py
++++ b/backend/app/api/routes_auth.py
+@@
+-from fastapi import APIRouter, Depends, HTTPException, status
++from fastapi import APIRouter, Depends, HTTPException, status, Request
+@@
++from app.security.bruteforce import check_or_ban, register_failure, register_success
+@@
+-@router.post("/auth/login")
+-def login(form: LoginForm, db: Session = Depends(get_db_session)):
+-    user = auth_service.authenticate(db, form.username, form.password)
+-    if not user:
+-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+-    return {"access_token": create_access_token(user.id)}
++@router.post("/auth/login")
++def login(request: Request, form: LoginForm, db: Session = Depends(get_db_session)):
++    ip = request.client.host
++    ok, reason = check_or_ban(ip, form.username)
++    if not ok:
++        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=reason)
++
++    user = auth_service.authenticate(db, form.username, form.password)
++    if not user:
++        register_failure(ip, form.username)
++        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
++
++    register_success(ip, form.username)
++    return {"access_token": create_access_token(user.id)}

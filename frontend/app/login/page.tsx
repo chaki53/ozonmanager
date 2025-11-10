@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+const API = process.env.NEXT_PUBLIC_API_BASE || ''
+
 export default function LoginPage(){
   const [email, setEmail] = useState('admin@local')
   const [password, setPassword] = useState('admin123')
@@ -12,17 +14,25 @@ export default function LoginPage(){
     e.preventDefault()
     setError(null)
     try {
-      const res = await fetch('/auth/login', {
+      const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: email, password })
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.detail || 'Auth failed')
-      const token = data.access_token || data.token
+      const text = await res.text()
+      let data: any = null
+      try { data = JSON.parse(text) } catch {}
+      if (!res.ok) {
+        const msg = (data && (data.detail || data.message)) || text || 'Auth failed'
+        throw new Error(msg)
+      }
+      const token = data?.access_token || data?.token
       if (!token) throw new Error('No token returned')
-      // store in cookie for middleware and in localStorage for fetch
-      document.cookie = `jwt=${token}; path=/; SameSite=Lax`
+
+      // cookie for middleware + localStorage for fetches
+      const parts = window.location.hostname.split('.')
+      const domain = parts.length>2 ? '.'+parts.slice(-2).join('.') : window.location.hostname
+      document.cookie = `jwt=${token}; Path=/; SameSite=Lax; Secure; Domain=${domain}`
       localStorage.setItem('jwt', token)
       router.replace('/dashboard')
     } catch (e:any) {

@@ -1,0 +1,1 @@
+Alembic config lives in backend/alembic/

@@ -1,34 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import settings
 from app.api.routes_auth import router as auth_router
-from app.api.routes_sync import router as sync_router
-from app.api.routes_reports import router as reports_router
-from app.api.routes_accounts import router as accounts_router
-from app.api.routes_dashboard import router as dashboard_router
-from app.api.routes_analytics import router as analytics_router
-from app.api.routes_me import router as me_router
-from app.api.routes_settings import router as settings_router
 
-app = FastAPI(title=settings.PROJECT_NAME)
+app = FastAPI(title="Ozon Manager API")
 
+ALLOWED = ["https://ruw.dgy2.ru"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
-
-app.include_router(auth_router)
-app.include_router(accounts_router)
-app.include_router(sync_router)
-app.include_router(reports_router)
-app.include_router(dashboard_router)
-app.include_router(analytics_router)
-app.include_router(me_router)
-app.include_router(settings_router)
 
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
+
+app.include_router(auth_router)

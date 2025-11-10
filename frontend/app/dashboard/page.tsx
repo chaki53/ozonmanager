@@ -1,105 +1,88 @@
 'use client'
 import { useEffect, useState } from 'react'
+import ReportCard from '@/components/ReportCard'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 
-type Pref = {
-  report_key: string
-  show_on_dashboard: boolean
-  send_to_telegram: boolean
-  send_to_email: boolean
-}
+type Widget = { key:string; title:string; type:'pie'|'bar'; enabled:boolean }
 
-const CATALOG: {key: string, title: string}[] = [
-  { key: 'sales_summary', title: 'Продажи: сводка' },
-  { key: 'stock_doc', title: 'Запасы и DoC' },
-  { key: 'abcxyz', title: 'ABC/XYZ' },
-  { key: 'transactions', title: 'Финансовые транзакции' },
-  { key: 'postings', title: 'Отгрузки (FBO/FBS)' },
+const initial: Widget[] = [
+  { key:'sales', title:'Продажи: сводка', type:'bar', enabled:true },
+  { key:'stock', title:'Запасы и DoC', type:'pie', enabled:true },
+  { key:'abc', title:'ABC/XYZ', type:'pie', enabled:true },
+  { key:'finance', title:'Финансовые транзакции', type:'bar', enabled:true },
+  { key:'ship', title:'Отгрузки (FBO/FBS)', type:'bar', enabled:true },
 ]
 
-export default function Dashboard() {
-  const [prefs, setPrefs] = useState<Pref[]>([])
-  const [dateFrom, setDateFrom] = useState<string>('')
-  const [dateTo, setDateTo] = useState<string>('')
+export default function Dashboard(){
+  const [widgets,setWidgets] = useState<Widget[]>(()=>{
+    if(typeof window==='undefined') return initial;
+    try{ return JSON.parse(localStorage.getItem('widgets')||'') || initial }catch{ return initial }
+  })
+  const [dateFrom,setDateFrom] = useState<string>('2025-10-11')
+  const [dateTo,setDateTo] = useState<string>('2025-11-10')
+  const [data,setData] = useState<any>({})
 
-  useEffect(() => {
-    // TODO: fetch /reports/preferences с токеном
-    setPrefs(CATALOG.map(c => ({report_key: c.key, show_on_dashboard: true, send_to_email: false, send_to_telegram: false})))
-    const today = new Date()
-    const from = new Date(); from.setDate(today.getDate() - 30)
-    setDateFrom(from.toISOString().slice(0,10))
-    setDateTo(today.toISOString().slice(0,10))
-  }, [])
+  useEffect(()=>{ localStorage.setItem('widgets', JSON.stringify(widgets)) },[widgets])
+
+  useEffect(()=>{
+    setData({
+      sales:[{name:'Выручка', value:1200},{name:'Маржа', value:360},{name:'Возвраты', value:50}],
+      stock:[{name:'Склад А', value:500, share:.5},{name:'Склад Б', value:300, share:.3},{name:'Склад В', value:200, share:.2}],
+      abc:[{name:'A', value:20, share:.2},{name:'B', value:30, share:.3},{name:'C', value:50, share:.5}],
+      finance:[{name:'Платежи', value:800},{name:'Комиссии', value:120},{name:'Доставка', value:90}],
+      ship:[{name:'FBO', value:600},{name:'FBS', value:400}],
+    })
+  },[dateFrom,dateTo])
+
+  function onDragEnd(result: DropResult){
+    if(!result.destination) return
+    const next = Array.from(widgets)
+    const [removed] = next.splice(result.source.index,1)
+    next.splice(result.destination.index,0,removed)
+    setWidgets(next)
+  }
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Дашборд</h1>
+    <main style={{padding:24, color:'#e5e7eb', background:'#0b0f14', minHeight:'100vh'}}>
+      <h1 style={{marginTop:0}}>Дашборд</h1>
 
-      <section style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <label>С:
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ marginLeft: 8 }}/>
-        </label>
-        <label>По:
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ marginLeft: 8 }}/>
-        </label>
-        <button onClick={() => {
-          // TODO: перезагрузить данные виджетов с учетом диапазона
-          alert(`Применён период ${dateFrom} — ${dateTo}`)
-        }}>Применить</button>
-      </section>
+      <div style={{display:'flex', gap:12, alignItems:'center', marginBottom:16}}>
+        <label>с: <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} /></label>
+        <label>по: <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} /></label>
+      </div>
 
-      <section style={{ marginTop: 16 }}>
-        <h2>Показывать на дашборде</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: 8 }}>
-          {CATALOG.map(item => {
-            const p = prefs.find(x => x.report_key === item.key)
-            const visible = p?.show_on_dashboard
-            if (!visible) return null
-            return (
-              <div key={item.key} style={{ padding: 16, border: '1px solid #ddd', borderRadius: 12 }}>
-                <b>{item.title}</b>
-                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
-                  Отчёт {item.key} за период {dateFrom} — {dateTo}
-                </div>
-                {/* TODO: fetch(`/dashboard/widgets?report_key=${item.key}&date_from=${dateFrom}&date_to=${dateTo}`)
-                    .then(r=>r.json()) and render real charts */}
-              </div>
-            )
-          })}
+      <details open style={{margin:'16px 0'}}>
+        <summary style={{cursor:'pointer'}}>Настройки отображения и каналов</summary>
+        <div style={{display:'grid', gap:8, marginTop:10}}>
+          {widgets.map((w,i)=>(
+            <label key={w.key} style={{display:'flex', gap:8, alignItems:'center'}}>
+              <input type="checkbox" checked={w.enabled} onChange={e=>{
+                const next=[...widgets]; next[i]={...w, enabled:e.target.checked}; setWidgets(next)
+              }}/>
+              <span>{w.title}</span>
+            </label>
+          ))}
         </div>
-      </section>
+      </details>
 
-      <section style={{ marginTop: 24 }}>
-        <h2>Настройки отображения и каналов</h2>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {CATALOG.map(c => {
-            const p = prefs.find(x => x.report_key === c.key) || {report_key: c.key, show_on_dashboard: false, send_to_email: false, send_to_telegram: false}
-            return (
-              <div key={c.key} style={{ padding: 12, border: '1px dashed #ccc', borderRadius: 12 }}>
-                <b>{c.title}</b>
-                <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                  <label><input type="checkbox" checked={p.show_on_dashboard} onChange={e => {
-                    const v = e.target.checked
-                    setPrefs(prev => prev.map(x => x.report_key===c.key?{...x, show_on_dashboard:v}:x))
-                  }}/> На дашборде</label>
-                  <label><input type="checkbox" checked={p.send_to_telegram} onChange={e => {
-                    const v = e.target.checked
-                    setPrefs(prev => prev.map(x => x.report_key===c.key?{...x, send_to_telegram:v}:x))
-                  }}/> В Telegram</label>
-                  <label><input type="checkbox" checked={p.send_to_email} onChange={e => {
-                    const v = e.target.checked
-                    setPrefs(prev => prev.map(x => x.report_key===c.key?{...x, send_to_email:v}:x))
-                  }}/> На e‑mail</label>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <button style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, border: '1px solid #333' }}
-          onClick={() => {
-            // TODO: POST /reports/preferences с токеном
-            alert('Сохранено (демо)')
-          }}>Сохранить настройки</button>
-      </section>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="list">
+          {(provided)=>(
+            <div ref={provided.innerRef} {...provided.droppableProps} style={{display:'grid', gap:16}}>
+              {widgets.filter(w=>w.enabled).map((w,i)=>(
+                <Draggable key={w.key} draggableId={w.key} index={i}>
+                  {(p)=>(
+                    <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
+                      <ReportCard title={w.title} type={w.type} data={data[w.key]||[]} />
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </main>
   )
 }

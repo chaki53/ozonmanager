@@ -1,32 +1,25 @@
 # Ozon Inventory Analytics (MVP)
 
-Готовый каркас: FastAPI + Next.js + PostgreSQL + Redis + Celery.
-- **Озон API ключи добавляют только Manager/Admin** (RBAC).
-- **Панель и админ‑панель доступны извне** (порты 3000 и 8000 опубликованы). Рекомендуется поставить nginx перед приложением в проде.
-- Автосоздание администратора, авто‑синхронизация (Celery Beat), принудительная синхронизация, отчёты в TG и на e‑mail (PDF).
+FastAPI + Next.js + PostgreSQL + Redis + Celery + Telegram + PDF.
+- RBAC: Ozon API добавляют **Manager/Admin**.
+- Дашборд и админка доступны извне через **Nginx + Let's Encrypt** (автонастройка в `install.sh`).
 
 ## Быстрый старт
 ```bash
 cp .env.sample .env
 ./install.sh
 ```
-- Frontend: http://localhost:3000 (вкл. `/admin`)
-- API: http://localhost:8000 (JWT авторизация)
+Инсталлятор:
+1. Поднимет Docker‑стек (службы привязаны к 127.0.0.1).
+2. Применит миграции и создаст первого админа.
+3. Предложит установить **Nginx** и выпустить **SSL-сертификаты** (ввод домена и e‑mail).
+   - Frontend → https://<ваш_домен>
+   - API → https://api.<ваш_домен>
 
-### Логин
-`admin@local` / `admin123` (сразу смените)
-
-## RBAC
-- Добавление/изменение Ozon API аккаунтов — **Manager+** (`POST /accounts`)
-- Удаление аккаунтов — **Admin** (`DELETE /accounts/{id}`)
-- Принудительная синхронизация — **Manager+** (`POST /sync/run`)
-
-## Принудительный синк
+## Ручной синк
 ```bash
 ./sync.sh
-# или через API с Bearer токеном:
-curl -X POST http://localhost:8000/sync/run -H "Authorization: Bearer <token>"
 ```
 
 ## Автосинхронизация
-Celery Beat с интервалами из `.env`: `SYNC_PERIOD_SECONDS`, `DAILY_REPORT_SECONDS`.
+Celery Beat с интервалами `SYNC_PERIOD_SECONDS`, `DAILY_REPORT_SECONDS` из `.env`.

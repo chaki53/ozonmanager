@@ -1,8 +1,15 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from jose import jwt, JWTError
 from passlib.context import CryptContext
-from jose import jwt
+from fastapi import HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordBearer
+
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.models.user import User
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
@@ -25,3 +32,27 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
     )
     to_encode = {"sub": subject, "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+def decode_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        sub = payload.get("sub")
+        if not sub:
+            raise ValueError("No sub")
+        return str(sub)
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    user_id = decode_token(token)
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found")
+    return user
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if getattr(user, "role", "viewer") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user

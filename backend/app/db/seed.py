@@ -1,10 +1,7 @@
 import os
 from app.models.user import User
 from app.db.session import SessionLocal
-try:
-    from app.core.security import get_password_hash
-except Exception:
-    from app.core.password import get_password_hash  # fallback
+from app.core.security import get_password_hash
 
 def seed_first_admin(session: SessionLocal):
     email = os.getenv("FIRST_ADMIN_EMAIL", "admin@local").strip().lower()

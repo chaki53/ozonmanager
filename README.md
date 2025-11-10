@@ -1,25 +1,18 @@
-# Ozon Inventory Analytics (MVP)
+# Ozon Inventory Analytics (MVP) — Ingest-only
 
-FastAPI + Next.js + PostgreSQL + Redis + Celery + Telegram + PDF.
-- RBAC: Ozon API добавляют **Manager/Admin**.
-- Дашборд и админка доступны извне через **Nginx + Let's Encrypt** (автонастройка в `install.sh`).
+Эта сборка настроена **односторонне**: данные **тянутся из Ozon → в вашу панель**.
+- Ключ `OZON_READONLY=true` запрещает любые неразрешённые вызовы к API Ozon.
+- Клиент `OzonClient` имеет **белый список** только читающих эндпоинтов.
+- Синхронизация **никогда не пишет** что-либо в Ozon API — только читает и сохраняет локально.
 
 ## Быстрый старт
 ```bash
 cp .env.sample .env
 ./install.sh
 ```
-Инсталлятор:
-1. Поднимет Docker‑стек (службы привязаны к 127.0.0.1).
-2. Применит миграции и создаст первого админа.
-3. Предложит установить **Nginx** и выпустить **SSL-сертификаты** (ввод домена и e‑mail).
-   - Frontend → https://<ваш_домен>
-   - API → https://api.<ваш_домен>
 
-## Ручной синк
+## Принудительная синхронизация
 ```bash
 ./sync.sh
+# или POST https://api.<домена>/sync/run (JWT: Manager/Admin)
 ```
-
-## Автосинхронизация
-Celery Beat с интервалами `SYNC_PERIOD_SECONDS`, `DAILY_REPORT_SECONDS` из `.env`.

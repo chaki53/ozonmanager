@@ -9,14 +9,21 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     FIRST_ADMIN_EMAIL: str = "admin@local"
     FIRST_ADMIN_PASSWORD: str = "admin123"
+
     TELEGRAM_BOT_TOKEN: str | None = None
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_FROM: str | None = None
+
     SYNC_PERIOD_SECONDS: int = 10800
     DAILY_REPORT_SECONDS: int = 86400
+
+    # Ozon
+    OZON_BASE_URL: str = "https://api-seller.ozon.ru"
+    OZON_READONLY: bool = True  # жестко: только чтение (ingest-only)
+
     class Config:
         env_file = ".env"
 

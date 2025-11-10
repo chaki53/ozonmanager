@@ -5,6 +5,7 @@ from app.db.session import get_db_session
 from app.models.account import Account
 from app.core.rbac import require_role
 from app.api.deps import get_current_user
+from app.services.ozon_client import OzonClient
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -38,3 +39,16 @@ def delete_account(account_id: str, db: Session = Depends(get_db_session)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
     db.delete(acc); db.commit()
     return {"ok": True}
+
+class TestPayload(BaseModel):
+    ozon_client_id: str
+    ozon_api_key: str
+
+@router.post("/test", dependencies=[Depends(require_role("manager"))])
+def test_account(payload: TestPayload):
+    try:
+        client = OzonClient(payload.ozon_client_id, payload.ozon_api_key)
+        data = client.list_warehouses()
+        return {"ok": True, "warehouses": len(data)}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"auth_failed: {e}")

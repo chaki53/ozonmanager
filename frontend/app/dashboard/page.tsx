@@ -18,15 +18,35 @@ const CATALOG: {key: string, title: string}[] = [
 
 export default function Dashboard() {
   const [prefs, setPrefs] = useState<Pref[]>([])
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
 
   useEffect(() => {
     // TODO: fetch /reports/preferences с токеном
     setPrefs(CATALOG.map(c => ({report_key: c.key, show_on_dashboard: true, send_to_email: false, send_to_telegram: false})))
+    const today = new Date()
+    const from = new Date(); from.setDate(today.getDate() - 30)
+    setDateFrom(from.toISOString().slice(0,10))
+    setDateTo(today.toISOString().slice(0,10))
   }, [])
 
   return (
     <main style={{ padding: 24 }}>
       <h1>Дашборд</h1>
+
+      <section style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label>С:
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ marginLeft: 8 }}/>
+        </label>
+        <label>По:
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ marginLeft: 8 }}/>
+        </label>
+        <button onClick={() => {
+          // TODO: перезагрузить данные виджетов с учетом диапазона
+          alert(`Применён период ${dateFrom} — ${dateTo}`)
+        }}>Применить</button>
+      </section>
+
       <section style={{ marginTop: 16 }}>
         <h2>Показывать на дашборде</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: 8 }}>
@@ -37,7 +57,11 @@ export default function Dashboard() {
             return (
               <div key={item.key} style={{ padding: 16, border: '1px solid #ddd', borderRadius: 12 }}>
                 <b>{item.title}</b>
-                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>Отчёт {item.key} (демо‑виджет)</div>
+                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
+                  Отчёт {item.key} за период {dateFrom} — {dateTo}
+                </div>
+                {/* TODO: fetch(`/dashboard/widgets?report_key=${item.key}&date_from=${dateFrom}&date_to=${dateTo}`)
+                    .then(r=>r.json()) and render real charts */}
               </div>
             )
           })}

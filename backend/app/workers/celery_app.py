@@ -7,6 +7,7 @@ celery = Celery(__name__, broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(settings.SYNC_PERIOD_SECONDS, sync_all_accounts.s(), name="sync_all")
     sender.add_periodic_task(settings.DAILY_REPORT_SECONDS, send_daily_reports.s(), name="daily_reports")
+    sender.add_periodic_task(30*60, check_doc_alerts.s(), name="doc_alerts")
 
 @celery.task
 def sync_all_accounts():
@@ -15,5 +16,10 @@ def sync_all_accounts():
 
 @celery.task
 def send_daily_reports():
-    # TODO: собрать и отправить PDF
+    # TODO
     pass
+
+@celery.task
+def check_doc_alerts():
+    from app.services.alerts import run_doc_alerts
+    run_doc_alerts()

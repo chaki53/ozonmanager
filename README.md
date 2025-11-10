@@ -1,13 +1,11 @@
-# Диапазон дат (from/to)
+# Аналитический кабинет и мониторинг (полный набор)
 
-- Для дашборда доступны эндпоинты:
-  - `GET /dashboard/kpi?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
-  - `GET /dashboard/widgets?report_key=<key>&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
-- На фронте `/dashboard` добавлены поля выбора дат «С» и «По» — период применяется ко всем виджетам.
-- В `/reports/send` и `/reports/render/{report_key}` передавайте диапазон в `params`:
-  ```json
-  {
-    "report_keys": ["sales_summary"],
-    "params": { "date_from": "2025-10-01", "date_to": "2025-11-10" }
-  }
-  ```
+В этом обновлении:
+- Модели: `warehouse`, `product`, `stock_snapshot`, `sales_fact`.
+- Миграция: `0003_inventory_sales`.
+- Материализованный вид `dr7_view` (средний дневной расход 7 дней) и расчёт DoC.
+- API: `/analytics/stock_overview` (фильтры по account_ids/warehouse_ids/product_ids).
+- Celery‑алерты: проверка DoC < 15 и отправка в Telegram.
+- Фронт: `/dashboard/stock` — обзор остатков/скорости/покрытия.
+
+> После ingestion добавьте периодическое `REFRESH MATERIALIZED VIEW CONCURRENTLY dr7_view;` (в Celery или после загрузки продаж) для актуальности DR7.

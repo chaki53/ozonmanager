@@ -1,7 +1,6 @@
+import './globals.css'
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru">
-      <body style={{ margin: 0, fontFamily: "system-ui" }}>{children}</body>
-    </html>
-  );
+    <html lang="ru"><body>{children}</body></html>
+  )
 }

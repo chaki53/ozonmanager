@@ -1,11 +1,19 @@
-# Аналитический кабинет и мониторинг (полный набор)
+# Интеграция Ozon (ingest-only) и синк
 
-В этом обновлении:
-- Модели: `warehouse`, `product`, `stock_snapshot`, `sales_fact`.
-- Миграция: `0003_inventory_sales`.
-- Материализованный вид `dr7_view` (средний дневной расход 7 дней) и расчёт DoC.
-- API: `/analytics/stock_overview` (фильтры по account_ids/warehouse_ids/product_ids).
-- Celery‑алерты: проверка DoC < 15 и отправка в Telegram.
-- Фронт: `/dashboard/stock` — обзор остатков/скорости/покрытия.
+### Синк по выбранным аккаунтам и глубине продаж
+```bash
+curl -X POST https://api.<домен>/sync/run \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{ "account_ids": ["<uuid>", "<uuid>"], "sales_days": 30 }'
+```
 
-> После ingestion добавьте периодическое `REFRESH MATERIALIZED VIEW CONCURRENTLY dr7_view;` (в Celery или после загрузки продаж) для актуальности DR7.
+### Telegram chat id (персонально)
+```bash
+curl -X POST https://api.<домен>/me/telegram \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{ "telegram_chat_id": "123456789" }'
+```
+
+> Продажи per SKU/склад для точного DR/DoC лучше считать по postings (FBO/FBS). В MVP заложены каркасы; можно оперативно добавить агрегирование из отгрузок.

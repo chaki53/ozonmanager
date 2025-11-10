@@ -1,35 +1,29 @@
+from datetime import date, timedelta
 from app.db.session import get_db_session
 from app.models.account import Account
 from app.services.ozon_client import OzonClient
-from app.core.config import settings
-import argparse
+from app.services.ingest import upsert_warehouses, upsert_products, upsert_stock_snapshots, upsert_sales_daily, refresh_dr7
 
-def _sync_account(acc):
-    client = OzonClient(acc.ozon_client_id, acc.ozon_api_key_enc)  # ENC заглушка
-    # Примеры чтения
-    wh = client.list_warehouses()
-    products = client.list_products(page=1, page_size=100)
-    # TODO: сохранить в локальную БД (таблицы справочников и снапшоты остатков/продаж)
-    # Здесь НЕТ обратной записи в Ozon — только загрузка в нашу систему.
-
-def _sync_all():
-    from app.db.session import SessionLocal
-    db = SessionLocal()
-    try:
-        accounts = db.query(Account).all()
+def sync_accounts(account_ids=None, sales_days: int = 14):
+    with get_db_session() as db:
+        q = db.query(Account)
+        if account_ids:
+            q = q.filter(Account.id.in_(account_ids))
+        accounts = q.all()
         for acc in accounts:
-            _sync_account(acc)
-    finally:
-        db.close()
+            client = OzonClient(acc.ozon_client_id, acc.ozon_api_key_enc)  # ENC заглушка
+            upsert_warehouses(db, acc, client)
+            upsert_products(db, acc, client)
+            upsert_stock_snapshots(db, acc, client)
+            # sales by postings is preferred; analytics_units kept for totals. For MVP, skip per-SKU sales until postings logic is added.
+            date_to = date.today()
+            date_from = date_to - timedelta(days=sales_days)
+            upsert_sales_daily(db, acc, client, date_from, date_to)
+        refresh_dr7(db)
+        db.commit()
 
 def force_sync_all():
-    _sync_all()
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--force", action="store_true")
-    args = parser.parse_args()
-    force_sync_all()
+    sync_accounts()
 
 if __name__ == "__main__":
-    main()
+    force_sync_all()

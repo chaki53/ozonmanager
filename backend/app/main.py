@@ -7,6 +7,7 @@ from app.api.routes_reports import router as reports_router
 from app.api.routes_accounts import router as accounts_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_analytics import router as analytics_router
+from app.api.routes_me import router as me_router
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -24,6 +25,7 @@ app.include_router(sync_router)
 app.include_router(reports_router)
 app.include_router(dashboard_router)
 app.include_router(analytics_router)
+app.include_router(me_router)
 
 @app.get("/healthz")
 def healthz():

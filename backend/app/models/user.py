@@ -10,3 +10,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="viewer")  # admin | manager | viewer
     is_active = Column(Boolean, default=True)
+    telegram_chat_id = Column(String, nullable=True)

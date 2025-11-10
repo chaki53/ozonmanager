@@ -18,6 +18,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {links.map(l => (
           <Link key={l.href} href={l.href} className={pathname===l.href ? 'active' : ''}>{l.label}</Link>
         ))}
+        <div style={{marginTop:16}}><Link href="/logout">Выйти</Link></div>
       </aside>
       <main className="main">
         {children}

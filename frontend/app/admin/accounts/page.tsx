@@ -1,97 +1,63 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/api'
 
-type Account = { id: string; name: string; tz: string }
+type Acc = { id:number; name:string; is_active:boolean; last_sync_at?:string|null }
 
-export default function AdminAccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [name, setName] = useState('')
-  const [clientId, setClientId] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [tz, setTz] = useState('Europe/Moscow')
-  const [token, setToken] = useState('')
+export default function AccountsPage(){
+  const [rows,setRows] = useState<Acc[]>([])
+  const [form,setForm] = useState({name:'', client_id:'', api_key:'', is_active:true})
+  const [msg,setMsg] = useState<string| null>(null)
 
-  useEffect(() => {
-    const t = localStorage.getItem('jwt') || ''
-    setToken(t); refresh(t)
-  }, [])
+  async function load(){
+    const r = await apiFetch('/accounts/'); if(r.ok){ setRows(await r.json()) }
+  }
+  useEffect(()=>{ load() },[])
 
-  async function refresh(tkn?: string) {
-    const res = await fetch('/accounts', { headers: { 'Authorization': 'Bearer ' + (tkn || token) } })
-    if (res.ok) setAccounts(await res.json())
+  async function add(e:React.FormEvent){
+    e.preventDefault(); setMsg(null)
+    const r = await apiFetch('/accounts/', { method:'POST', body: JSON.stringify(form) })
+    setMsg(r.ok ? 'Кабинет добавлен' : await r.text())
+    if(r.ok){ setForm({name:'', client_id:'', api_key:'', is_active:true}); load() }
   }
 
-  async function testKeys() {
-    const res = await fetch('/accounts/test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ ozon_client_id: clientId, ozon_api_key: apiKey })
-    })
-    const data = await res.json()
-    alert(res.ok ? ('OK: складов ' + data.warehouses) : ('Ошибка: ' + (data?.detail || 'auth failed')))
-  }
-
-  async function create() {
-    const res = await fetch('/accounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ name, ozon_client_id: clientId, ozon_api_key: apiKey, tz })
-    })
-    if (res.ok){ setName(''); setClientId(''); setApiKey(''); refresh(); } else { alert('Не удалось сохранить') }
-  }
-
-  async function del(id: string) {
-    if (!confirm('Удалить аккаунт?')) return
-    const res = await fetch('/accounts/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } })
-    if (res.ok) refresh()
-  }
-
-  async function syncOne(id: string) {
-    const res = await fetch('/sync/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ account_ids: [id], sales_days: 30 })
-    })
-    alert(res.ok ? 'Синхронизация запущена' : 'Ошибка запуска синка')
+  async function del(id:number){
+    if(!confirm('Удалить кабинет?')) return
+    const r = await apiFetch(`/accounts/${id}`, { method:'DELETE' })
+    setMsg(r.ok ? 'Удалён' : await r.text()); if(r.ok) load()
   }
 
   return (
-    <div className="container">
-      <div className="header"><h1 className="h1">Ozon аккаунты</h1></div>
+    <main style={{minHeight:'100vh', background:'#0b0f14', color:'#e5e7eb', padding:24}}>
+      <h1>Ozon кабинеты</h1>
+      {msg && <div style={{margin:'12px 0', color:'#c7f9cc'}}>{msg}</div>}
+      <section style={{display:'grid', gridTemplateColumns:'1fr', gap:16, maxWidth:760}}>
+        <form onSubmit={add} style={{background:'#111827', border:'1px solid #1f2937', borderRadius:16, padding:16}}>
+          <h3 style={{marginTop:0}}>Добавить кабинет</h3>
+          <div style={{display:'grid', gap:8}}>
+            <input placeholder="Название" value={form.name} onChange={e=>setForm({...form, name:e.target.value})}/>
+            <input placeholder="Client-Id" value={form.client_id} onChange={e=>setForm({...form, client_id:e.target.value})}/>
+            <input placeholder="Api-Key" value={form.api_key} onChange={e=>setForm({...form, api_key:e.target.value})}/>
+            <label style={{opacity:.8}}><input type="checkbox" checked={form.is_active} onChange={e=>setForm({...form, is_active:e.target.checked})}/> Активен</label>
+            <button style={{background:'linear-gradient(135deg,#22d3ee,#3b82f6)',color:'#001018',border:0,padding:'10px 14px',borderRadius:10,fontWeight:700,cursor:'pointer'}}>Сохранить</button>
+          </div>
+        </form>
 
-      <div className="card" style={{marginTop:16}}>
-        <div className="h2">Добавить аккаунт</div>
-        <div className="grid grid-2">
-          <input className="input" placeholder="Название (например, Main Ozon)" value={name} onChange={e=>setName(e.target.value)} />
-          <input className="input" placeholder="Часовой пояс (Europe/Moscow)" value={tz} onChange={e=>setTz(e.target.value)} />
-          <input className="input" placeholder="Client-ID" value={clientId} onChange={e=>setClientId(e.target.value)} />
-          <input className="input" placeholder="API-key" value={apiKey} onChange={e=>setApiKey(e.target.value)} />
+        <div style={{background:'#111827', border:'1px solid #1f2937', borderRadius:16, padding:16}}>
+          <h3 style={{marginTop:0}}>Список</h3>
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+            <thead><tr><th>ID</th><th>Название</th><th>Активен</th><th>Last sync</th><th/></tr></thead>
+            <tbody>
+              {rows.map(r=>(
+                <tr key={r.id}>
+                  <td>{r.id}</td><td>{r.name}</td><td>{r.is_active?'✓':'—'}</td><td style={{opacity:.7}}>{r.last_sync_at || '—'}</td>
+                  <td><button onClick={()=>del(r.id)} style={{background:'transparent', border:'1px solid #334155', color:'#e5e7eb', borderRadius:8, padding:'6px 10px'}}>Удалить</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div style={{display:'flex', gap:8, marginTop:12}}>
-          <button className="btn sec" onClick={testKeys}>Проверить доступ</button>
-          <button className="btn" onClick={create}>Сохранить</button>
-        </div>
-      </div>
-
-      <div className="card" style={{marginTop:16}}>
-        <div className="h2">Список аккаунтов</div>
-        <table className="table">
-          <thead><tr><th>Название</th><th>TZ</th><th style={{textAlign:'right'}}>Действия</th></tr></thead>
-          <tbody>
-            {accounts.map(a => (
-              <tr key={a.id}>
-                <td>{a.name}</td>
-                <td>{a.tz}</td>
-                <td style={{textAlign:'right'}}>
-                  <button className="btn sec" onClick={()=>syncOne(a.id)} style={{marginRight:8}}>Синхронизировать</button>
-                  <button className="btn sec" onClick={()=>del(a.id)} style={{borderColor:'#b91c1c', color:'#fecaca'}}>Удалить</button>
-                </td>
-              </tr>
-            ))}
-            {accounts.length===0 && <tr><td colSpan={3} style={{opacity:.6}}>Пока нет аккаунтов</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }

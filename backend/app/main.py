@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.routes_auth import router as auth_router
 from app.api.routes_search import router as search_router
+from app.api.routes_accounts import router as accounts_router
+from app.api.routes_sync import router as sync_router
 
 app = FastAPI(title="Ozon Manager API")
 
@@ -21,3 +24,5 @@ def healthz():
 
 app.include_router(auth_router)
 app.include_router(search_router)
+app.include_router(accounts_router)
+app.include_router(sync_router)

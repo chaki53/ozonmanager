@@ -8,3 +8,5 @@ passlib
 python-dotenv
 pydantic
 python-multipart
+httpx
+apscheduler

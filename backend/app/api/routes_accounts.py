@@ -1,54 +1,43 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from app.db.session import get_db_session
-from app.models.account import Account
-from app.core.rbac import require_role
-from app.api.deps import get_current_user
-from app.services.ozon_client import OzonClient
+from typing import List
+from app.db.session import get_db
+from app.core.security import require_admin, get_current_user
+from app.models.ozon import OzonAccount
+from app.integrations.ozon_client import OzonClient
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 class AccountIn(BaseModel):
-    name: str
-    ozon_client_id: str
-    ozon_api_key: str
-    tz: str | None = "Europe/Moscow"
+    name: str = Field(..., min_length=2)
+    client_id: str
+    api_key: str
+    is_active: bool = True
 
 class AccountOut(BaseModel):
-    id: str
+    id: int
     name: str
-    tz: str
+    is_active: bool
+    last_sync_at: str | None
 
-@router.get("", response_model=list[AccountOut])
-def list_accounts(db: Session = Depends(get_db_session), user=Depends(get_current_user)):
-    rows = db.query(Account).all()
-    return [AccountOut(id=str(r.id), name=r.name, tz=r.tz) for r in rows]
+@router.get("/", response_model=List[AccountOut])
+def list_accounts(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    rows = db.query(OzonAccount).order_by(OzonAccount.id.desc()).all()
+    return [{"id":r.id,"name":r.name,"is_active":r.is_active,"last_sync_at":r.last_sync_at.isoformat() if r.last_sync_at else None} for r in rows]
 
-@router.post("", dependencies=[Depends(require_role("manager"))])
-def create_account(payload: AccountIn, db: Session = Depends(get_db_session)):
-    acc = Account(name=payload.name, ozon_client_id=payload.ozon_client_id,
-                  ozon_api_key_enc=payload.ozon_api_key, tz=payload.tz or "Europe/Moscow")
-    db.add(acc); db.commit()
-    return {"ok": True}
+@router.post("/", response_model=AccountOut)
+def create_account(payload: AccountIn, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    acc = OzonAccount(name=payload.name, client_id=payload.client_id, api_key=payload.api_key, is_active=payload.is_active)
+    # sanity check
+    if not OzonClient(acc.client_id, acc.api_key).health():
+        raise HTTPException(400, "Ozon credentials check failed")
+    db.add(acc); db.commit(); db.refresh(acc)
+    return {"id":acc.id,"name":acc.name,"is_active":acc.is_active,"last_sync_at":acc.last_sync_at.isoformat() if acc.last_sync_at else None}
 
-@router.delete("/{account_id}", dependencies=[Depends(require_role("admin"))])
-def delete_account(account_id: str, db: Session = Depends(get_db_session)):
-    acc = db.query(Account).get(account_id)
-    if not acc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+@router.delete("/{account_id}")
+def delete_account(account_id: int, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    acc = db.get(OzonAccount, account_id)
+    if not acc: raise HTTPException(404, "Not found")
     db.delete(acc); db.commit()
     return {"ok": True}
-
-class TestPayload(BaseModel):
-    ozon_client_id: str
-    ozon_api_key: str
-
-@router.post("/test", dependencies=[Depends(require_role("manager"))])
-def test_account(payload: TestPayload):
-    try:
-        client = OzonClient(payload.ozon_client_id, payload.ozon_api_key)
-        data = client.list_warehouses()
-        return {"ok": True, "warehouses": len(data)}
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"auth_failed: {e}")
